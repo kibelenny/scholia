@@ -74,3 +74,8 @@ requirement, so Scholia uses the spec's fallback, `io.legere:pdfiumandroid` (2.0
 
 PDF highlights are stored as `{page, start, end}` character ranges. EPUB highlights are stored as
 Readium `Locator` JSON.
+
+## Fonts
+
+Merriweather and Plus Jakarta Sans are bundled under the SIL Open Font License 1.1; see
+`licenses/`.
