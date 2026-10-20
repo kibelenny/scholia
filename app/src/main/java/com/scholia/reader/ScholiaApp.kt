@@ -10,6 +10,7 @@ class ScholiaApp : Application() {
     val database by lazy { AppDatabase.create(this) }
     val repository by lazy { BookRepository(database, contentResolver) }
     val epubOpener by lazy { EpubOpener(this) }
+    val prefs by lazy { getSharedPreferences("scholia", MODE_PRIVATE) }
 }
 
 val Context.app: ScholiaApp get() = applicationContext as ScholiaApp

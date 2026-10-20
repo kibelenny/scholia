@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -188,6 +189,12 @@ private fun PdfPageView(
             Modifier
                 .fillMaxSize()
                 .onGloballyPositioned { viewport = it.boundsInWindow().roundToIntRect() }
+                // Taps in the margins around the page behave like taps on blank page areas.
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        if (currentSelection != null) currentCallbacks.onSelection(null) else currentCallbacks.onTapEmpty()
+                    }
+                }
                 .pointerInput(pageWPx, pageHPx) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
@@ -291,7 +298,8 @@ private fun PdfPageView(
                                     val c = ev.changes.firstOrNull { it.id == down.id }
                                     result = when {
                                         c == null -> Press.Cancel
-                                        !c.pressed -> if (c.isConsumed) Press.Cancel else Press.Tap
+                                        // Consume the tap so the margin tap handler below doesn't see it too.
+                                        !c.pressed -> if (c.isConsumed) Press.Cancel else Press.Tap.also { c.consume() }
                                         c.isConsumed || (c.position - down.position).getDistance() > viewConfiguration.touchSlop -> Press.Cancel
                                         else -> null
                                     }

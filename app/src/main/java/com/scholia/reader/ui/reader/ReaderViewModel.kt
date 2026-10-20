@@ -53,6 +53,15 @@ class ReaderViewModel(private val app: ScholiaApp, val bookId: Long, jumpToHighl
     var positionLabel by mutableStateOf("")
         private set
 
+    /** Zen mode: app and system bars hidden. Remembered across books and launches. */
+    var zen by mutableStateOf(app.prefs.getBoolean(PREF_ZEN, false))
+        private set
+
+    fun setZenMode(on: Boolean) {
+        zen = on
+        app.prefs.edit().putBoolean(PREF_ZEN, on).apply()
+    }
+
     /**
      * Latest EPUB position. The Readium view is rebuilt when the reader comes back from the notes
      * screen, and must restart here rather than at the position the book was opened with.
@@ -152,6 +161,8 @@ class ReaderViewModel(private val app: ScholiaApp, val bookId: Long, jumpToHighl
         }
     }
 }
+
+private const val PREF_ZEN = "zen_mode"
 
 fun String.toLocator(): Locator? =
     if (isBlank()) null else runCatching { Locator.fromJSON(JSONObject(this)) }.getOrNull()

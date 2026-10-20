@@ -30,6 +30,8 @@ import org.readium.r2.navigator.Selection
 import org.readium.r2.navigator.epub.EpubNavigatorFactory
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 import org.readium.r2.navigator.epub.EpubPreferences
+import org.readium.r2.navigator.input.InputListener
+import org.readium.r2.navigator.input.TapEvent
 import org.readium.r2.navigator.preferences.Color as ReadiumColor
 import org.readium.r2.navigator.preferences.Theme
 import org.readium.r2.shared.ExperimentalReadiumApi
@@ -65,6 +67,8 @@ fun EpubReader(
     onLocator: (Locator) -> Unit,
     onSelection: (Selection?) -> Unit,
     onHighlightTap: (Long) -> Unit,
+    /** A tap on the text that wasn't a link, highlight or selection. */
+    onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val activity = LocalActivity.current as FragmentActivity
@@ -73,6 +77,7 @@ fun EpubReader(
     var navigator by remember { mutableStateOf<EpubNavigatorFragment?>(null) }
     val latestOnSelection by rememberUpdatedState(onSelection)
     val latestOnTap by rememberUpdatedState(onHighlightTap)
+    val latestOnPlainTap by rememberUpdatedState(onTap)
     val containerId = remember { View.generateViewId() }
 
     // Replaces the system text-selection menu: we keep the selection alive with an empty menu and
@@ -121,6 +126,14 @@ fun EpubReader(
                         object : DecorableNavigator.Listener {
                             override fun onDecorationActivated(event: DecorableNavigator.OnActivatedEvent): Boolean {
                                 event.decoration.id.toLongOrNull()?.let(latestOnTap)
+                                return true
+                            }
+                        },
+                    )
+                    fragment.addInputListener(
+                        object : InputListener {
+                            override fun onTap(event: TapEvent): Boolean {
+                                latestOnPlainTap()
                                 return true
                             }
                         },

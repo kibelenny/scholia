@@ -1,6 +1,21 @@
 package com.scholia.reader.ui.reader
 
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.material.icons.outlined.Fullscreen
+import androidx.compose.material3.ScaffoldDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -80,14 +95,27 @@ fun ReaderScreen(bookId: Long, jumpToHighlight: Long, onBack: () -> Unit, onOpen
     var goPrev by remember { mutableStateOf<(() -> Unit)?>(null) }
     var goNext by remember { mutableStateOf<(() -> Unit)?>(null) }
 
+    ZenSystemBars(vm.zen)
+    // Back leaves zen mode before it leaves the book. (Readers register their own handlers later,
+    // so clearing a selection still takes priority.)
+    BackHandler(enabled = vm.zen) { vm.setZenMode(false) }
+
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        // In zen mode the page runs edge to edge, even while the system bars peek in on a swipe.
+        contentWindowInsets = if (vm.zen) WindowInsets(0) else ScaffoldDefaults.contentWindowInsets,
         topBar = {
+            AnimatedVisibility(
+                visible = !vm.zen,
+                enter = expandVertically(expandFrom = Alignment.Top) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Top) + fadeOut(),
+            ) {
             Column {
                 TopAppBar(
                     title = { Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     navigationIcon = { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Outlined.ArrowBack, "Back") } },
                     actions = {
+                        IconButton(onClick = { vm.setZenMode(true) }) { Icon(Icons.Outlined.Fullscreen, "Zen mode") }
                         IconButton(onClick = onOpenNotes) { Icon(Icons.AutoMirrored.Outlined.Notes, "Notes") }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -112,24 +140,33 @@ fun ReaderScreen(bookId: Long, jumpToHighlight: Long, onBack: () -> Unit, onOpen
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             }
+            }
         },
         bottomBar = {
-            ReaderFooter(
-                progress = vm.progress,
-                label = vm.positionLabel,
-                format = book?.format,
-                onPrev = goPrev,
-                onNext = goNext,
-            )
+            AnimatedVisibility(
+                visible = !vm.zen,
+                enter = expandVertically(expandFrom = Alignment.Bottom) + fadeIn(),
+                exit = shrinkVertically(shrinkTowards = Alignment.Bottom) + fadeOut(),
+            ) {
+                ReaderFooter(
+                    progress = vm.progress,
+                    label = vm.positionLabel,
+                    format = book?.format,
+                    onPrev = goPrev,
+                    onNext = goNext,
+                )
+            }
         },
     ) { padding ->
         Box(Modifier.fillMaxSize().padding(padding)) {
+            val toggleZen = { vm.setZenMode(!vm.zen) }
             when (val doc = vm.doc) {
                 ReaderDoc.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
                 is ReaderDoc.Failed -> FailedState(doc.message, onBack)
-                is ReaderDoc.Pdf -> PdfContent(vm, doc, highlights, title, setNav = { p, n -> goPrev = p; goNext = n })
-                is ReaderDoc.Epub -> EpubContent(vm, doc, highlights, title, setNav = { p, n -> goPrev = p; goNext = n })
+                is ReaderDoc.Pdf -> PdfContent(vm, doc, highlights, title, toggleZen, setNav = { p, n -> goPrev = p; goNext = n })
+                is ReaderDoc.Epub -> EpubContent(vm, doc, highlights, title, toggleZen, setNav = { p, n -> goPrev = p; goNext = n })
             }
+            ZenHint(vm.zen, Modifier.align(Alignment.BottomCenter))
         }
     }
 
@@ -159,6 +196,7 @@ private fun PdfContent(
     doc: ReaderDoc.Pdf,
     highlights: List<com.scholia.reader.data.Highlight>,
     title: String,
+    onToggleZen: () -> Unit,
     setNav: (prev: () -> Unit, next: () -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
@@ -192,7 +230,7 @@ private fun PdfContent(
             onSelection = { selection = it },
             onSelectingChanged = { selecting = it },
             onHighlightTap = { vm.editing = it },
-            onTapEmpty = {},
+            onTapEmpty = onToggleZen,
             toolbar = { sel, anchor, visibleArea ->
                 val location = PdfLocation(sel.page, sel.start, sel.end).encode()
                 HighlighterToolbar(
@@ -217,6 +255,7 @@ private fun EpubContent(
     doc: ReaderDoc.Epub,
     highlights: List<com.scholia.reader.data.Highlight>,
     title: String,
+    onToggleZen: () -> Unit,
     setNav: (prev: () -> Unit, next: () -> Unit) -> Unit,
 ) {
     val context = LocalContext.current
@@ -243,6 +282,7 @@ private fun EpubContent(
             },
             onSelection = { selection = it },
             onHighlightTap = { id -> highlights.firstOrNull { it.id == id }?.let { vm.editing = it } },
+            onTap = onToggleZen,
         )
 
         val sel = selection
@@ -336,5 +376,48 @@ private fun FailedState(message: String, onBack: () -> Unit) {
         Text(message, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onBack) { Text("Back to library") }
+    }
+}
+
+/** Hides the status and navigation bars in zen mode; a swipe from the edge shows them briefly. */
+@Composable
+private fun ZenSystemBars(zen: Boolean) {
+    val view = LocalView.current
+    val window = (LocalActivity.current ?: return).window
+    DisposableEffect(zen) {
+        val controller = WindowCompat.getInsetsController(window, view)
+        if (zen) {
+            controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+        onDispose { controller.show(WindowInsetsCompat.Type.systemBars()) }
+    }
+}
+
+/** Brief "how to get out" hint shown each time zen mode starts. */
+@Composable
+private fun ZenHint(zen: Boolean, modifier: Modifier = Modifier) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(zen) {
+        visible = zen
+        if (zen) {
+            delay(2500)
+            visible = false
+        }
+    }
+    AnimatedVisibility(visible, enter = fadeIn(), exit = fadeOut(), modifier = modifier.padding(bottom = 32.dp)) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.inverseSurface.copy(alpha = 0.88f),
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ) {
+            Text(
+                "Tap the page to show controls",
+                style = MaterialTheme.typography.labelLarge,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 10.dp),
+            )
+        }
     }
 }

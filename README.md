@@ -40,6 +40,11 @@ you uninstall the old app, which deletes its library and notes.
   - **PDFs:** swipe sideways, one page per screen. Pinch to zoom; drag to pan while zoomed.
   - **EPUBs:** scroll vertically.
   - The arrows at the bottom step pages (PDF) or chapters (EPUB).
+- **Zen mode:** tap the full-screen icon in the reader's top bar, or tap a blank part of the page.
+  - The app bars and Android's status and navigation bars hide, and the page fills the screen.
+  - Tap the page again, or press Back, to bring the controls back.
+  - Swiping in from a screen edge peeks the system bars without leaving zen mode.
+  - Scholia remembers the setting, so books open in zen mode until you turn it off.
 - **Highlight:** long-press a word, then drag to extend the selection or adjust the handles.
   - Tap a colour to highlight.
   - Tap **Note** to highlight and write a note.
