@@ -193,7 +193,7 @@ private fun PdfContent(
             onSelectingChanged = { selecting = it },
             onHighlightTap = { vm.editing = it },
             onTapEmpty = {},
-            toolbar = { sel, anchor ->
+            toolbar = { sel, anchor, visibleArea ->
                 val location = PdfLocation(sel.page, sel.start, sel.end).encode()
                 HighlighterToolbar(
                     anchor = anchor,
@@ -202,6 +202,7 @@ private fun PdfContent(
                     onNote = { vm.beginNote(location, sel.text, "Page ${sel.page + 1}"); selection = null },
                     onCopy = { copyText(context, sel.text); selection = null },
                     onShare = { shareText(context, sel.text, title); selection = null },
+                    visibleArea = visibleArea,
                 )
             },
         ),

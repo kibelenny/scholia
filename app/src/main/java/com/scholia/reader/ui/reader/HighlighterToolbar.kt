@@ -55,13 +55,15 @@ fun HighlighterToolbar(
     onNote: () -> Unit,
     onCopy: () -> Unit,
     onShare: () -> Unit,
+    /** Window-space area the toolbar must stay inside (e.g. the reading area between app bars). */
+    visibleArea: IntRect? = null,
 ) {
     val dark = isSystemInDarkTheme()
     val container = if (dark) Color(0xFF2B2A28) else Color(0xFF2F2C28)
     val strip = if (dark) Color(0xFF363433) else Color(0xFF3A3632)
     val onContainer = Color(0xFFF4F0E8)
     val noteColor = if (dark) Color(0xFFE0884E) else Color(0xFFB35D35)
-    val positioner = remember(anchor) { AboveOrBelow(anchor) }
+    val positioner = remember(anchor, visibleArea) { AboveOrBelow(anchor, visibleArea) }
 
     Popup(popupPositionProvider = positioner, properties = PopupProperties(focusable = false)) {
         Surface(
@@ -125,8 +127,11 @@ private fun ToolbarAction(
     }
 }
 
-/** Centers the popup over the anchor, above it when there's room, otherwise below. */
-private class AboveOrBelow(private val anchor: IntRect) : PopupPositionProvider {
+/**
+ * Centers the popup over the anchor, above it when there's room, otherwise below, and always
+ * inside [visibleArea] (or the host's bounds) so it never covers the app bars.
+ */
+private class AboveOrBelow(private val anchor: IntRect, private val visibleArea: IntRect?) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
         windowSize: IntSize,
@@ -137,10 +142,11 @@ private class AboveOrBelow(private val anchor: IntRect) : PopupPositionProvider 
         val abs = anchor.translate(anchorBounds.topLeft)
         val x = (abs.center.x - popupContentSize.width / 2)
             .coerceIn(margin, (windowSize.width - popupContentSize.width - margin).coerceAtLeast(margin))
+        val area = visibleArea ?: anchorBounds
+        val minTop = maxOf(area.top, 0) + margin
+        val maxTop = (minOf(area.bottom, windowSize.height) - popupContentSize.height - margin).coerceAtLeast(minTop)
         val above = abs.top - popupContentSize.height - margin
-        val minTop = anchorBounds.top + margin
-        val y = if (above >= minTop) above
-        else (abs.bottom + margin * 2).coerceAtMost(windowSize.height - popupContentSize.height - margin)
+        val y = (if (above >= minTop) above else abs.bottom + margin * 2).coerceIn(minTop, maxTop)
         return IntOffset(x, y)
     }
 }

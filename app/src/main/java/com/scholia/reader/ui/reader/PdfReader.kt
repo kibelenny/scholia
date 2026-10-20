@@ -37,6 +37,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.roundToIntRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.foundation.gestures.calculatePan
@@ -65,7 +68,7 @@ class PdfCallbacks(
     val onHighlightTap: (Highlight) -> Unit,
     val onTapEmpty: () -> Unit,
     /** The toolbar for a finished selection; drawn by the page so it can anchor to the text. */
-    val toolbar: @Composable (selection: PdfSelection, anchor: IntRect) -> Unit,
+    val toolbar: @Composable (selection: PdfSelection, anchor: IntRect, visibleArea: IntRect?) -> Unit,
 )
 
 @Composable
@@ -178,10 +181,13 @@ private fun PdfPageView(
         val currentSelection by rememberUpdatedState(selection)
         val currentHighlights by rememberUpdatedState(highlightRects)
         val currentCallbacks by rememberUpdatedState(callbacks)
+        // On-screen reading area (between the app bars); the toolbar is kept inside it.
+        var viewport by remember { mutableStateOf<IntRect?>(null) }
 
         Box(
             Modifier
                 .fillMaxSize()
+                .onGloballyPositioned { viewport = it.boundsInWindow().roundToIntRect() }
                 .pointerInput(pageWPx, pageHPx) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
@@ -382,15 +388,17 @@ private fun PdfPageView(
             if (selection != null && !selecting && selectionRects.isNotEmpty()) {
                 val wPx = with(density) { pageW.toPx() }
                 val hPx = with(density) { pageH.toPx() }
-                fun tx(x: Float) = ((x * wPx - wPx / 2) * scale + wPx / 2 + pan.x).toInt()
-                fun ty(y: Float) = ((y * hPx - hPx / 2) * scale + hPx / 2 + pan.y).toInt()
+                // The popup host is the zoomed page layer, whose on-screen bounds already include
+                // the pan; only the scale needs applying to page-relative positions.
+                fun tx(x: Float) = (x * wPx * scale).toInt()
+                fun ty(y: Float) = (y * hPx * scale).toInt()
                 val anchor = IntRect(
                     tx(selectionRects.minOf { it.left }),
                     ty(selectionRects.minOf { it.top }),
                     tx(selectionRects.maxOf { it.right }),
                     ty(selectionRects.maxOf { it.bottom }),
                 )
-                callbacks.toolbar(selection, anchor)
+                callbacks.toolbar(selection, anchor, viewport)
             }
         }
         }
