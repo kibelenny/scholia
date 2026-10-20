@@ -90,14 +90,20 @@ fun NotesScreen(bookId: Long, onBack: () -> Unit, onJump: (highlightId: Long) ->
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var editing by remember { mutableStateOf<Highlight?>(null) }
+    // Bumped when a deleted highlight is restored, so its list item gets a new key and a fresh
+    // swipe state; otherwise the old "dismissed" state would delete it again straight away.
+    var restoreCount by remember { mutableStateOf(mapOf<Long, Int>()) }
     val book = state.book
 
     fun deleteWithUndo(h: Highlight) {
         vm.delete(h)
         scope.launch {
             snackbar.currentSnackbarData?.dismiss()
-            val result = snackbar.showSnackbar("Highlight deleted", actionLabel = "Undo", duration = SnackbarDuration.Short)
-            if (result == SnackbarResult.ActionPerformed) vm.restore(h)
+            val result = snackbar.showSnackbar("Highlight deleted", actionLabel = "Undo", duration = SnackbarDuration.Long)
+            if (result == SnackbarResult.ActionPerformed) {
+                restoreCount = restoreCount + (h.id to (restoreCount[h.id] ?: 0) + 1)
+                vm.restore(h)
+            }
         }
     }
 
@@ -166,7 +172,7 @@ fun NotesScreen(bookId: Long, onBack: () -> Unit, onJump: (highlightId: Long) ->
                 }
             }
 
-            items(state.visible, key = { it.id }) { h ->
+            items(state.visible, key = { "${it.id}:${restoreCount[it.id] ?: 0}" }) { h ->
                 val dismiss = rememberSwipeToDismissBoxState()
                 SwipeToDismissBox(
                     state = dismiss,
