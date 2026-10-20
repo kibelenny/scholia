@@ -95,14 +95,17 @@ fun HomeScreen(onOpenBook: (Long) -> Unit, onOpenNotes: (Long) -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = launchPicker,
-                icon = { Icon(Icons.Outlined.Add, null) },
-                text = { Text("Import Book", style = MaterialTheme.typography.titleSmall) },
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary,
-                shape = RoundedCornerShape(50),
-            )
+            // The empty state has its own import button.
+            if (state.allBooks.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = launchPicker,
+                    icon = { Icon(Icons.Outlined.Add, null) },
+                    text = { Text("Import Book", style = MaterialTheme.typography.titleSmall) },
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                    shape = RoundedCornerShape(50),
+                )
+            }
         },
     ) { padding ->
         val continueBook = state.allBooks.firstOrNull()
@@ -186,7 +189,7 @@ fun HomeScreen(onOpenBook: (Long) -> Unit, onOpenNotes: (Long) -> Unit) {
             title = { Text("Remove from library?") },
             text = {
                 Text(
-                    "“${book.title}” will be removed from Folio" +
+                    "“${book.title}” will be removed from Scholia" +
                         (if (count > 0) " along with its $count highlight${if (count == 1) "" else "s"} and notes" else "") +
                         ". The file itself stays on your device.",
                 )
@@ -218,7 +221,7 @@ private fun TopBar(searching: Boolean, onToggleSearch: () -> Unit) {
         }
         Spacer(Modifier.width(12.dp))
         Text(
-            "Folio",
+            "Scholia",
             style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.weight(1f),

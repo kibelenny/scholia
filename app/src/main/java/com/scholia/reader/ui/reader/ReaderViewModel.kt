@@ -52,6 +52,12 @@ class ReaderViewModel(private val app: ScholiaApp, val bookId: Long, jumpToHighl
 
     var positionLabel by mutableStateOf("")
         private set
+
+    /**
+     * Latest EPUB position. The Readium view is rebuilt when the reader comes back from the notes
+     * screen, and must restart here rather than at the position the book was opened with.
+     */
+    var epubLocator: Locator? = null
     var progress by mutableStateOf(0f)
         private set
 
@@ -90,7 +96,7 @@ class ReaderViewModel(private val app: ScholiaApp, val bookId: Long, jumpToHighl
 
     private fun openError(e: Throwable): String =
         if (e is SecurityException || e is java.io.FileNotFoundException) {
-            "Folio can no longer access this file. It may have been moved or deleted — remove it and import it again."
+            "Scholia can no longer access this file. It may have been moved or deleted — remove it and import it again."
         } else {
             "Couldn't open this book: ${e.message ?: e::class.simpleName}"
         }

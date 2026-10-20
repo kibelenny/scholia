@@ -4,8 +4,8 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import com.scholia.reader.ui.FolioNavHost
-import com.scholia.reader.ui.theme.FolioTheme
+import com.scholia.reader.ui.ScholiaNavHost
+import com.scholia.reader.ui.theme.ScholiaTheme
 import org.readium.r2.navigator.epub.EpubNavigatorFragment
 
 class MainActivity : AppCompatActivity() {
@@ -25,8 +25,8 @@ class MainActivity : AppCompatActivity() {
 
         enableEdgeToEdge()
         setContent {
-            FolioTheme {
-                FolioNavHost()
+            ScholiaTheme {
+                ScholiaNavHost()
             }
         }
     }

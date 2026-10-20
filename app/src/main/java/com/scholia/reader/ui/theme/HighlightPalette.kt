@@ -22,9 +22,11 @@ enum class HighlightColor(
     Coral("Dusty Coral", 0xFFF0A890.toInt(), Color(0xFFF8CDBE), Color(0xFF7E3F4D), Color(0xFFCF6A4E), Color(0xFFC9727F)),
     Lavender("Lavender", 0xFFB9B0F0.toInt(), Color(0xFFDCD6FA), Color(0xFF4F4785), Color(0xFF8479CF), Color(0xFF9A8FE0));
 
-    /** Translucent fill drawn over page text. */
-    @Composable
-    fun fill(): Color = if (isSystemInDarkTheme()) darkFill.copy(alpha = 0.55f) else lightFill.copy(alpha = 0.6f)
+    /**
+     * Opaque colour for blending over a rendered PDF page: multiplied in light mode (black text
+     * stays black) and screened in dark mode (light text stays light).
+     */
+    fun pageFill(dark: Boolean): Color = if (dark) darkFill else lightFill
 
     /** Solid tone for swatches, bars and dots. */
     @Composable

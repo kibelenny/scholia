@@ -228,13 +228,14 @@ private fun EpubContent(
     Box(Modifier.fillMaxSize()) {
         EpubReader(
             publication = doc.publication,
-            initialLocator = doc.initialLocator,
+            initialLocator = vm.epubLocator ?: doc.initialLocator,
             highlights = highlights,
             onNavigator = { nav ->
                 navigator = nav
                 if (nav != null) setNav({ nav.goBackward(animated = true) }, { nav.goForward(animated = true) })
             },
             onLocator = { loc ->
+                vm.epubLocator = loc
                 val chapter = loc.title?.takeIf { it.isNotBlank() }
                     ?: doc.publication.tableOfContents.firstOrNull { it.href.toString().substringBefore('#') == loc.href.toString() }?.title
                 vm.savePosition(loc.toJSON().toString(), loc.locations.totalProgression?.toFloat() ?: 0f, chapter.orEmpty())
@@ -254,7 +255,13 @@ private fun EpubContent(
                 scope.launch {
                     val current = nav.currentSelection() ?: return@launch
                     val text = current.locator.text.highlight.orEmpty().trim()
-                    if (text.isNotEmpty()) block(current.locator.toJSON().toString(), text, current.locator.title.orEmpty())
+                    // Selection locators carry no chapter title; keep the current one for labels.
+                    val locator = if (current.locator.title.isNullOrBlank() && vm.positionLabel.isNotBlank()) {
+                        current.locator.copy(title = vm.positionLabel)
+                    } else {
+                        current.locator
+                    }
+                    if (text.isNotEmpty()) block(locator.toJSON().toString(), text, locator.title.orEmpty())
                     nav.clearSelection()
                     selection = null
                 }

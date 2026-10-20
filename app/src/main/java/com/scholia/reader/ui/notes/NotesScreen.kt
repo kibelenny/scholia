@@ -244,7 +244,12 @@ private fun BookHeader(book: Book, highlights: Int, notes: Int, onExport: () -> 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Outlined.BookmarkBorder, null, modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(4.dp))
-                    Text("$highlights Highlights • $notes Notes", style = MaterialTheme.typography.labelMedium, modifier = Modifier.weight(1f))
+                    Text(
+                        "$highlights ${if (highlights == 1) "Highlight" else "Highlights"} • " +
+                            "$notes ${if (notes == 1) "Note" else "Notes"}",
+                        style = MaterialTheme.typography.labelMedium,
+                        modifier = Modifier.weight(1f),
+                    )
                     if (highlights > 0) {
                         TextButton(onClick = onExport, contentPadding = PaddingValues(horizontal = 8.dp)) {
                             Icon(Icons.Outlined.IosShare, null, modifier = Modifier.size(16.dp))

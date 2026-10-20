@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -163,7 +164,9 @@ private fun PdfPageView(
             }
 
             val selectionColor = MaterialTheme.colorScheme.primary
-            val fills = HighlightColor.entries.associateWith { it.fill() }
+            val fills = HighlightColor.entries.associateWith { it.pageFill(dark) }
+            val accents = HighlightColor.entries.associateWith { it.accent() }
+            val blend = if (dark) BlendMode.Screen else BlendMode.Multiply
             val handleRadius = with(density) { 28.dp.toPx() }
 
             Canvas(
@@ -201,7 +204,8 @@ private fun PdfPageView(
                                         val p = change.position - Offset(0f, handleRadius * 0.6f)
                                         val i = t.nearestChar(nx(p), ny(p))
                                         if (i >= 0) {
-                                            if (movingStart) s = minOf(i, e) else e = maxOf(i, s)
+                                            val w = t.wordAt(i)
+                                            if (movingStart) s = minOf(w.first, e) else e = maxOf(w.last, s)
                                             emit(s, e)
                                         }
                                     }
@@ -241,7 +245,10 @@ private fun PdfPageView(
                                         c.consume()
                                         if (!c.pressed) break
                                         val j = t.nearestChar(nx(c.position), ny(c.position))
-                                        if (j >= 0) emit(minOf(word.first, j), maxOf(word.last, j))
+                                        if (j >= 0) {
+                                            val w = t.wordAt(j)
+                                            emit(minOf(word.first, w.first), maxOf(word.last, w.last))
+                                        }
                                     }
                                     currentCallbacks.onSelectingChanged(false)
                                 }
@@ -266,7 +273,8 @@ private fun PdfPageView(
                 )
                 val pad = 1.5.dp.toPx()
                 for ((h, rects) in highlightRects) {
-                    val fill = fills.getValue(HighlightColor.fromKey(h.color))
+                    val color = HighlightColor.fromKey(h.color)
+                    val fill = fills.getValue(color)
                     for (r in rects) {
                         val (o, s) = r.toPx()
                         drawRoundRect(
@@ -274,20 +282,24 @@ private fun PdfPageView(
                             topLeft = o - Offset(pad, pad),
                             size = Size(s.width + pad * 2, s.height + pad * 2),
                             cornerRadius = CornerRadius(3.dp.toPx()),
+                            blendMode = blend,
                         )
-                        if (!h.note.isNullOrBlank()) {
-                            // A thin underline marks highlights that carry a note.
-                            drawRect(
-                                fill.copy(alpha = 1f),
-                                topLeft = Offset(o.x, o.y + s.height + pad),
-                                size = Size(s.width, 1.5.dp.toPx()),
-                            )
-                        }
+                    }
+                    val last = rects.lastOrNull()
+                    if (last != null && !h.note.isNullOrBlank()) {
+                        // A dot after the last word marks highlights that carry a note. (An
+                        // underline would cut through the next line on tightly set pages.)
+                        val r = 3.dp.toPx()
+                        drawCircle(
+                            accents.getValue(color),
+                            radius = r,
+                            center = Offset(last.right * size.width + pad + r * 1.6f, last.top * size.height + r + pad),
+                        )
                     }
                 }
                 for (r in selectionRects) {
                     val (o, s) = r.toPx()
-                    drawRect(selectionColor.copy(alpha = 0.22f), topLeft = o, size = s)
+                    drawRect(selectionColor.copy(alpha = if (dark) 0.35f else 0.22f), topLeft = o, size = s)
                 }
                 if (selectionRects.isNotEmpty()) {
                     val first = selectionRects.first()

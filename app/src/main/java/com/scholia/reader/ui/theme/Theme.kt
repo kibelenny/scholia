@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.scholia.reader.R
 
-// Palette from the "Folio" Stitch design system.
+// Palette from the Stitch design system (Stitch project "Android E-Book Reader").
 private val LightColors = lightColorScheme(
     primary = Color(0xFF94451F),
     onPrimary = Color(0xFFFFFFFF),
@@ -118,7 +118,7 @@ val PlusJakartaSans = FontFamily(jakarta(400), jakarta(500), jakarta(600), jakar
 
 private val Base = Typography()
 
-private val FolioTypography = Typography(
+private val ScholiaTypography = Typography(
     displayLarge = TextStyle(fontFamily = Merriweather, fontWeight = FontWeight.Bold, fontSize = 30.sp, lineHeight = 40.sp),
     headlineLarge = TextStyle(fontFamily = Merriweather, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 32.sp),
     headlineMedium = TextStyle(fontFamily = Merriweather, fontWeight = FontWeight.Bold, fontSize = 22.sp, lineHeight = 30.sp),
@@ -143,7 +143,7 @@ val QuoteStyle = TextStyle(
     lineHeight = 26.sp,
 )
 
-private val FolioShapes = Shapes(
+private val ScholiaShapes = Shapes(
     extraSmall = RoundedCornerShape(6.dp),
     small = RoundedCornerShape(10.dp),
     medium = RoundedCornerShape(16.dp),
@@ -152,11 +152,11 @@ private val FolioShapes = Shapes(
 )
 
 @Composable
-fun FolioTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun ScholiaTheme(dark: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
     MaterialTheme(
         colorScheme = if (dark) DarkColors else LightColors,
-        typography = FolioTypography,
-        shapes = FolioShapes,
+        typography = ScholiaTypography,
+        shapes = ScholiaShapes,
         content = content,
     )
 }

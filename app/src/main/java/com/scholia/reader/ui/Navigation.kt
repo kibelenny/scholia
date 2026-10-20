@@ -18,7 +18,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class NotesRoute(val bookId: Long)
 
 @Composable
-fun FolioNavHost() {
+fun ScholiaNavHost() {
     val nav = rememberNavController()
     NavHost(navController = nav, startDestination = HomeRoute) {
         composable<HomeRoute> {
