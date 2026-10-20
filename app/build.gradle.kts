@@ -14,15 +14,20 @@ android {
         applicationId = "com.scholia.reader"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Personal sideload build: sign with the debug key so the APK installs directly.
-            signingConfig = signingConfigs.getByName("debug")
+            // Left unsigned here: scripts/release.sh signs it with the release key plus the
+            // rotation lineage from the old debug key, so it updates v1.0 installs in place.
+            signingConfig = null
+        }
+        debug {
+            // Installs beside the release app, so test builds never touch the real library.
+            applicationIdSuffix = ".debug"
         }
     }
 

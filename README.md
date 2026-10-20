@@ -20,17 +20,38 @@ Android 8.0 (API 26) or newer.
 Requires JDK 21 and the Android SDK (platform 37, build-tools 37.0.0). Point `local.properties` at
 the SDK, e.g. `sdk.dir=/opt/homebrew/share/android-commandlinetools`.
 
+**Release build** (signed, installs as an update over any earlier version and keeps your library):
+
 ```sh
-export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
-./gradlew assembleRelease
-cp app/build/outputs/apk/release/app-release.apk release/reader.apk
+./scripts/release.sh
 ```
 
-`./gradlew assembleDebug` builds a debug APK in `app/build/outputs/apk/debug/`.
+This writes `release/scholia-v<version>.apk`, a copy at `release/reader.apk`, and a `.sha256`
+checksum. Bump `versionCode` and `versionName` in `app/build.gradle.kts` before each release.
 
-The release build is signed with this machine's Android debug key (`~/.android/debug.keystore`).
-An APK built on another machine has a different signature. It won't install over this one until
-you uninstall the old app, which deletes its library and notes.
+**Debug build:** `./gradlew assembleDebug`. It installs as a separate app, "Scholia (dev)"
+(`com.scholia.reader.debug`), so testing never touches your real library.
+
+### Signing
+
+- **v1.0** was signed with this Mac's Android debug key.
+- **From v1.1**, releases are signed with a dedicated release key and a key-rotation lineage
+  (debug key → release key). Android 9+ accepts them as updates to v1.0. Older devices still see
+  the debug key in the v2 signature.
+
+The signing files live outside the repo, in `~/.config/scholia-signing/`:
+
+| File | What it is |
+|---|---|
+| `release.jks` | the release key |
+| `legacy-debug.keystore` | copy of the original debug key |
+| `lineage.bin` | rotation lineage |
+| `signing.properties` | paths and passwords |
+
+**Back this folder up somewhere safe** (e.g. a password manager or encrypted drive). Without
+`release.jks` and its password, no future build can update an installed copy. You would have to
+uninstall, which deletes the library and notes. Set `SCHOLIA_SIGNING` to use the folder from
+another location.
 
 ## Using it
 
