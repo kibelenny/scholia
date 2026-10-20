@@ -18,7 +18,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -38,6 +37,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.foundation.gestures.calculatePan
+import androidx.compose.foundation.gestures.calculateZoom
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.unit.dp
 import com.scholia.reader.data.Highlight
 import com.scholia.reader.pdf.NRect
@@ -76,11 +84,12 @@ fun PdfReader(
             .filter { it.first.start >= 0 }
             .groupBy({ it.first.page }, { it.first to it.second })
     }
+    var zoomed by remember { mutableStateOf(false) }
     HorizontalPager(
         state = pagerState,
         beyondViewportPageCount = 1,
-        // Don't let a selection drag turn into a page swipe.
-        userScrollEnabled = !selecting,
+        // Don't let a selection drag or a pan of a zoomed page turn into a page swipe.
+        userScrollEnabled = !selecting && !zoomed,
         key = { it },
         modifier = modifier,
     ) { page ->
@@ -91,6 +100,7 @@ fun PdfReader(
             selection = selection?.takeIf { it.page == page },
             selecting = selecting,
             callbacks = callbacks,
+            onZoomedChanged = { if (page == pagerState.currentPage) zoomed = it },
         )
     }
 }
@@ -117,6 +127,7 @@ private fun PdfPageView(
     selection: PdfSelection?,
     selecting: Boolean,
     callbacks: PdfCallbacks,
+    onZoomedChanged: (Boolean) -> Unit,
 ) {
     val dark = isSystemInDarkTheme()
     val density = LocalDensity.current
@@ -129,7 +140,30 @@ private fun PdfPageView(
         val pageH = if (ratio > boxRatio) maxWidth / ratio else maxHeight
         val widthPx = with(density) { pageW.roundToPx() }
 
-        val bitmap: Bitmap? by produceState<Bitmap?>(null, page, widthPx) { value = engine.render(page, widthPx) }
+        var scale by remember { mutableFloatStateOf(1f) }
+        var pan by remember { mutableStateOf(Offset.Zero) }
+        val isZoomed = scale > 1.01f
+        LaunchedEffect(isZoomed) { onZoomedChanged(isZoomed) }
+        // Re-render at 2x/3x once zoomed so text stays sharp instead of an upscaled bitmap.
+        val renderScale = when {
+            scale > 2.2f -> 3
+            scale > 1.2f -> 2
+            else -> 1
+        }
+        val boxWPx = constraints.maxWidth.toFloat()
+        val boxHPx = constraints.maxHeight.toFloat()
+        val pageWPx = with(density) { pageW.toPx() }
+        val pageHPx = with(density) { pageH.toPx() }
+        fun clampPan(p: Offset, s: Float) = Offset(
+            p.x.coerceIn(-maxOf(0f, (pageWPx * s - boxWPx) / 2), maxOf(0f, (pageWPx * s - boxWPx) / 2)),
+            p.y.coerceIn(-maxOf(0f, (pageHPx * s - boxHPx) / 2), maxOf(0f, (pageHPx * s - boxHPx) / 2)),
+        )
+
+        // Keep the last sharp bitmap on screen while a higher-resolution one renders.
+        var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+        LaunchedEffect(page, widthPx, renderScale) {
+            engine.render(page, widthPx * renderScale)?.let { bitmap = it }
+        }
         val text: PageText? by produceState<PageText?>(null, page) { value = engine.text(page) }
 
         val highlightRects = remember(text, highlights) {
@@ -147,7 +181,36 @@ private fun PdfPageView(
 
         Box(
             Modifier
+                .fillMaxSize()
+                .pointerInput(pageWPx, pageHPx) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        do {
+                            val ev = awaitPointerEvent()
+                            val fingers = ev.changes.count { it.pressed }
+                            // Two fingers always zoom; one finger pans only when already zoomed
+                            // and nothing nearer (a selection drag) has taken the event.
+                            val panning = fingers == 1 && scale > 1.01f && ev.changes.none { it.isConsumed }
+                            if (fingers >= 2 || panning) {
+                                val newScale = (scale * ev.calculateZoom()).coerceIn(1f, 4f)
+                                pan = if (newScale <= 1.01f) Offset.Zero else clampPan(pan + ev.calculatePan(), newScale)
+                                scale = newScale
+                                ev.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        } while (ev.changes.any { it.pressed })
+                    }
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+        Box(
+            Modifier
                 .size(pageW, pageH)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                    translationX = pan.x
+                    translationY = pan.y
+                }
                 .background(if (dark) Color(0xFF1C1B1A) else Color.White),
         ) {
             val bmp = bitmap
@@ -319,14 +382,17 @@ private fun PdfPageView(
             if (selection != null && !selecting && selectionRects.isNotEmpty()) {
                 val wPx = with(density) { pageW.toPx() }
                 val hPx = with(density) { pageH.toPx() }
+                fun tx(x: Float) = ((x * wPx - wPx / 2) * scale + wPx / 2 + pan.x).toInt()
+                fun ty(y: Float) = ((y * hPx - hPx / 2) * scale + hPx / 2 + pan.y).toInt()
                 val anchor = IntRect(
-                    (selectionRects.minOf { it.left } * wPx).toInt(),
-                    (selectionRects.minOf { it.top } * hPx).toInt(),
-                    (selectionRects.maxOf { it.right } * wPx).toInt(),
-                    (selectionRects.maxOf { it.bottom } * hPx).toInt(),
+                    tx(selectionRects.minOf { it.left }),
+                    ty(selectionRects.minOf { it.top }),
+                    tx(selectionRects.maxOf { it.right }),
+                    ty(selectionRects.maxOf { it.bottom }),
                 )
                 callbacks.toolbar(selection, anchor)
             }
+        }
         }
     }
 }
